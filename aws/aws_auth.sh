@@ -62,6 +62,20 @@ aws_get_sessions() {
     awk '/^\[sso-session / { gsub(/\[|\]/,""); print $2 }' ~/.aws/config
 }
 
+aws_sso_login() {
+    local profiles=($(awk '
+/^\[profile / {profile=$2; gsub(/\]/,"",profile)}
+/sso_session[ ]*=/ {print profile}
+' ~/.aws/config))
+    profile=$(printf "%s\n" "${profiles[@]}" | fzf --prompt="👆 請選擇要登入的 profile：")
+    if [ -z "$profile" ]; then
+        echo -e "${RED}未選擇 profile，退出腳本 ....${WHITE}"
+        exit 1
+    fi
+    aws sso login --profile ${profile}
+    aws_terminal_profile_export ${profile}
+}
+
 aws_sso_logout() {
     # aws sso logout
     # 確認 aws config list 的 profile 是否為 <not set>

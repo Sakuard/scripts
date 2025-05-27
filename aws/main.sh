@@ -4,7 +4,7 @@ source ./aws_auth.sh
 source ./aws_init.sh
 
 choose_action() {
-    actions=("aws_sso_add_profile" "aws_sso_setup" "aws_switch_profile" "aws_sso_logout" "aws_add_kubecontext")
+    actions=("aws_sso_add_profile" "aws_sso_setup" "aws_switch_profile" "aws_sso_login" "aws_sso_logout" "aws_add_kubecontext")
     action=$(printf "%s\n" "${actions[@]}" | fzf --prompt="👆 請選擇要操作的功能：")
     case $action in
     "aws_sso_add_profile")
@@ -16,13 +16,16 @@ choose_action() {
     "aws_switch_profile")
         aws_switch_profile
         ;;
+    "aws_sso_login")
+        aws_sso_login
+        ;;
     "aws_sso_logout")
         aws_sso_logout
         ;;
     "aws_add_kubecontext")
         read -r -e -p "🔥 請輸入要新增的 cluster 所屬 region" region
         read -r -e -p "🔥 請輸入要新增的 cluster name" cluster_name
-
+        aws eks --region ${region} update-kubeconfig --name ${cluster_name}
         ;;
     esac
 }
