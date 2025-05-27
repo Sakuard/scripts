@@ -11,6 +11,46 @@ for i in "${!commands[@]}"; do
     package_check "${cmd}" "${pkg}"
 done
 
+aws_configure_add_profile() {
+    # 這是用於新增 sso-session profile 的功能
+    # 先對 ~/.aws/config grep 確認有哪些 sso-session
+    # 用 printf 列出所有 sso-session，讓 user 選擇要操作的 sso-session
+    sso_sessions=($(awk '/^\[sso-session / { gsub(/\[|\]/,""); print $2 }' ~/.aws/config))
+    sso_session=$(printf "%s\n" "${sso_sessions[@]}" | fzf --prompt="👆 請選擇要新增的 sso-session：")
+    if [ -z "$sso_session" ]; then
+        echo -e "${RED}未選擇 sso-session，退出腳本 ....${WHITE}"
+        exit 1
+    fi
+    # 後續再選擇要新增的 profile name
+    read -r -e -p "🔥 請輸入要新增的 profile 名稱：" profile
+    if [ -z "$profile" ]; then
+        echo "profile 名稱不可為空！"
+        exit 1
+    fi
+    read -r -e -p "🔥 請輸入要新增的 Role 名稱：" role
+    if [ -z "$role" ]; then
+        echo "Role 名稱不可為空！"
+        exit 1
+    fi
+
+
+    # 用腳本的方式，對 ~/.aws/config 新增 profil，記得 sso_session 以及 sso_role_name 需要對應設定
+    sso_account_id=$(awk -v ss="$sso_session" '
+            $0 ~ /^\[profile / {in_profile=1; found=0}
+            $0 ~ /^\[/ && $0 !~ /^\[profile / {in_profile=0}
+            in_profile && $0 ~ "^sso_session[ ]*=[ ]*"ss {found=1}
+            in_profile && found && $0 ~ /^sso_account_id[ ]*=/ {
+                gsub(/[ ]*sso_account_id[ ]*=[ ]*/,"")
+                print $0
+                exit
+            }
+        ' ~/.aws/config)
+    echo "[profile ${profile}]
+sso_session = ${sso_session}
+sso_account_id = ${sso_account_id}
+sso_role_name = ${role}" >> ~/.aws/config
+}
+
 aws_configure() {
     aws configure sso
 }
@@ -68,10 +108,10 @@ aws_choose_profile() {
 aws_confirm_profile() {
     echo -e "\n${BLUE}======= 選擇為 ${YELLOW}${profile}${WHITE} ${BLUE}=======${WHITE}\n"
     echo -e "手動執行指令如下：\n${GREEN}aws sso login --profile ${profile}\n${WHITE}"
-    read -r -e -p "是否要執行 SSO 登入？ (請輸入 apply)：" continue
+    read -r -e -p "是否要切換到 ${profile} ？ (請輸入 apply)：" continue
     case $continue in
     "apply")
-        aws sso login --profile ${profile}
+        # aws sso login --profile ${profile}
         aws_terminal_profile_export ${profile}
         ;;
     esac
@@ -102,7 +142,7 @@ aws_confirm_session() {
 }
 
 
-aws_sso_profile_login() {
+aws_switch_profile() {
     aws_config_check
     aws_choose_profile
 }
